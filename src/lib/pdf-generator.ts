@@ -1,7 +1,9 @@
 import puppeteer from 'puppeteer';
+import { INVOICE_HEADER_B64, INVOICE_LOGO_B64 } from './invoice-images';
 
 interface InvoiceData {
   invoiceNumber: string;
+  cycleNumber?: string;
   periodFrom: string;
   periodTo: string;
   previousReading: number;
@@ -39,148 +41,260 @@ export async function generateInvoicePDF(
 ): Promise<Buffer> {
   const title = settings['invoice_title'] || 'فاتورة استهلاك كهرباء';
   const footerNote = settings['footer_note'] || 'ملاحظة: المحطة غير مسؤولة عن تسليم أي مبلغ بدون سند رسمي';
-  const orgName = settings['organization_name'] || '';
+
+  // Extract invoice display number (just the numeric part or sequential)
+  const invoiceDisplayNum = invoice.invoiceNumber.replace(/^INV-\d{4}-\d{2}-/, '') || invoice.invoiceNumber;
+  const cycleNum = invoice.cycleNumber || subscriber.routeNumber || '';
 
   const html = `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
 <head>
 <meta charset="UTF-8">
 <style>
-  @page { size: A4; margin: 15mm; }
+  @page {
+    size: Letter;
+    margin: 20mm 25mm 20mm 25mm;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+    font-family: "Cambria", Arial, Tahoma, "Segoe UI", sans-serif;
     direction: rtl;
-    font-size: 14px;
-    color: #1a1a1a;
+    font-size: 12pt;
+    color: #000000;
     background: white;
-    padding: 20px;
+    line-height: 1.0;
   }
-  .header {
+
+  /* ===== HEADER SECTION ===== */
+  .header-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    direction: rtl;
+  }
+  .header-banner {
+    flex: 1;
+  }
+  .header-banner img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .header-logo {
+    width: 60px;
+    height: 60px;
+    margin-right: 0;
+    margin-left: 0;
+    flex-shrink: 0;
+  }
+  .header-logo img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+
+  /* ===== TITLE ===== */
+  .title {
     text-align: center;
-    margin-bottom: 20px;
-    padding-bottom: 10px;
-    border-bottom: 3px double #333;
+    margin-bottom: 8px;
+    padding-top: 0;
+    padding-bottom: 0;
   }
-  .header h1 {
-    font-size: 24px;
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #1a365d;
+  .title h1 {
+    font-size: 16pt;
+    font-weight: 700;
+    color: #0000FF;
+    text-decoration: underline;
+    text-decoration-skip-ink: none;
+    margin: 0;
+    padding: 0;
+    font-family: "Calibri", Arial, sans-serif;
+    line-height: 1.0;
   }
-  .header .org-name {
-    font-size: 14px;
-    color: #555;
-  }
-  .header .invoice-num {
-    font-size: 12px;
-    color: #777;
-    margin-top: 5px;
-  }
+
+  /* ===== TABLES COMMON ===== */
   table {
     width: 100%;
     border-collapse: collapse;
-    margin-bottom: 15px;
+    margin-bottom: 0;
+  }
+
+  /* ===== INFO TABLE (Table 1) ===== */
+  .info-table {
+    margin-bottom: 0;
   }
   .info-table td {
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    font-size: 13px;
+    border: 1pt solid #000000;
+    padding: 1.8pt 5.4pt;
+    font-size: 12pt;
+    font-weight: 700;
+    color: #000000;
+    vertical-align: middle;
+    line-height: 1.0;
   }
-  .info-table td.label {
-    background: #f0f4f8;
-    font-weight: bold;
-    width: 15%;
-    color: #2d3748;
+  .info-table .label-cell {
+    font-family: "Arial", sans-serif;
+    white-space: nowrap;
+    width: 14%;
   }
-  .info-table td.value {
-    width: 35%;
+  .info-table .value-cell {
+    font-family: "Cambria", serif;
+    width: 36%;
+  }
+  .info-table .value-cell-period {
+    font-family: "Arial", sans-serif;
+    font-weight: 700;
+    width: 36%;
+  }
+
+  /* ===== SEPARATOR LINE ===== */
+  .separator {
+    margin: 0;
+    padding: 0;
+    text-align: center;
+  }
+  .separator img {
+    width: 100%;
+    height: 2px;
+  }
+  .separator-line {
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(to left, #fbd5b5, #e8a85c, #fbd5b5);
+    margin: 0;
+  }
+
+  /* ===== DATA TABLE (Table 2) ===== */
+  .data-table {
+    margin-bottom: 0;
   }
   .data-table th {
-    background: #2d3748;
-    color: white;
-    padding: 10px 8px;
-    border: 1px solid #2d3748;
-    font-size: 12px;
-    font-weight: bold;
+    background-color: #fbd5b5;
+    color: #000000;
+    padding: 1.8pt 5.4pt;
+    border: 1pt solid #000000;
+    font-size: 12pt;
+    font-weight: 700;
     text-align: center;
+    vertical-align: bottom;
+    font-family: "Arial", sans-serif;
+    line-height: 1.0;
   }
   .data-table td {
-    padding: 10px 8px;
-    border: 1px solid #ccc;
+    padding: 1.8pt 5.4pt;
+    border: 1pt solid #000000;
     text-align: center;
-    font-size: 13px;
+    font-size: 12pt;
+    font-weight: 700;
+    color: #000000;
+    vertical-align: middle;
+    font-family: "Cambria", serif;
+    line-height: 1.0;
   }
-  .words-row {
-    background: #f7fafc;
-    font-weight: bold;
-    text-align: right !important;
-    padding: 12px !important;
-    font-size: 13px;
-    color: #2d3748;
+  .data-table .net-due-value {
+    color: #0000FF;
+    font-weight: 700;
+    font-family: "Cambria", serif;
   }
-  .footer-note {
-    margin-top: 20px;
-    padding: 10px;
-    border: 1px solid #e2e8f0;
-    background: #fffbeb;
-    font-size: 12px;
-    display: flex;
-    justify-content: space-between;
+  .data-table .words-row td {
+    text-align: right;
+    padding: 9pt 5.4pt 0pt 5.4pt;
+    font-size: 11pt;
+    font-weight: 700;
+    color: #000000;
+    font-family: "Cambria", serif;
+    border-right: 0;
+    border-left: 0;
+    border-bottom: 0;
+    border-top: 1pt solid #000000;
   }
-  .footer-note .note { color: #c05621; font-weight: bold; }
-  .footer-note .accounts { color: #2d3748; }
-  .signature-area {
-    margin-top: 40px;
-    display: flex;
-    justify-content: space-between;
+
+  /* ===== BOTTOM SEPARATOR ===== */
+  .bottom-separator {
+    margin: 0;
+    padding: 0;
   }
-  .signature-box {
-    text-align: center;
-    width: 200px;
+
+  /* ===== FOOTER TABLE (Table 3) ===== */
+  .footer-table {
+    margin-top: 0;
+    border-collapse: collapse;
   }
-  .signature-box .line {
-    border-top: 1px solid #333;
-    margin-top: 50px;
-    padding-top: 5px;
-    font-size: 12px;
+  .footer-table td {
+    border: 0;
+    padding: 0pt 5.4pt;
+    font-size: 12pt;
+    font-weight: 700;
+    vertical-align: top;
+    line-height: 1.0;
+  }
+  .footer-table .note-cell {
+    color: #0000FF;
+    text-align: right;
+    font-family: "Arial", sans-serif;
+    width: 83%;
+  }
+  .footer-table .accounts-cell {
+    color: #000000;
+    text-align: right;
+    font-family: "Arial", sans-serif;
+    width: 17%;
   }
 </style>
 </head>
 <body>
-  <div class="header">
-    <h1>${title}</h1>
-    ${orgName ? `<div class="org-name">${orgName}</div>` : ''}
-    <div class="invoice-num">رقم الفاتورة: ${invoice.invoiceNumber}</div>
+
+  <!-- HEADER: Company banner + Logo -->
+  <div class="header-section">
+    <div class="header-banner">
+      <img src="${INVOICE_HEADER_B64}" alt="شركة العباسي للتوليد الطاقة الكهربائية" />
+    </div>
+    <div class="header-logo">
+      <img src="${INVOICE_LOGO_B64}" alt="شعار الشركة" />
+    </div>
   </div>
 
+  <!-- TITLE -->
+  <div class="title">
+    <h1>${title}</h1>
+  </div>
+
+  <!-- TABLE 1: SUBSCRIBER INFO -->
   <table class="info-table">
     <tr>
-      <td class="label">رقم خط السير :</td>
-      <td class="value">${subscriber.routeNumber}</td>
-      <td class="label">رقم المشترك :</td>
-      <td class="value">${subscriber.subscriberNumber}</td>
+      <td class="label-cell">رقم الفاتورة :</td>
+      <td class="value-cell">${invoiceDisplayNum}</td>
+      <td class="label-cell">رقم الدورة :</td>
+      <td class="value-cell">${cycleNum}</td>
     </tr>
     <tr>
-      <td class="label">اسم المشترك :</td>
-      <td class="value">${subscriber.subscriberName}</td>
-      <td class="label">رقم العداد :</td>
-      <td class="value">${subscriber.meterNumber}</td>
+      <td class="label-cell">اسم المشترك:</td>
+      <td class="value-cell">${subscriber.subscriberName}</td>
+      <td class="label-cell">رقم العداد :</td>
+      <td class="value-cell">${subscriber.meterNumber}</td>
     </tr>
     <tr>
-      <td class="label">الفترة :</td>
-      <td class="value">من ${invoice.periodFrom} حتى ${invoice.periodTo}</td>
-      <td class="label">الكبينة :</td>
-      <td class="value">${subscriber.cabinName}</td>
+      <td class="label-cell">الفترة        :</td>
+      <td class="value-cell-period">من  ${invoice.periodFrom} حتى ${invoice.periodTo}</td>
+      <td class="label-cell">الكبينة     :</td>
+      <td class="value-cell">${subscriber.cabinName}</td>
     </tr>
   </table>
 
+  <!-- SEPARATOR between info table and data table -->
+  <div class="separator">
+    <div class="separator-line"></div>
+  </div>
+
+  <!-- TABLE 2: READINGS & AMOUNTS -->
   <table class="data-table">
     <thead>
       <tr>
         <th>القراءة السابقة</th>
         <th>القراءة الحالية</th>
-        <th>الاستهلاك /k.w</th>
+        <th>الاستهلاك</th>
         <th>القيمة</th>
         <th>خدمات</th>
         <th>المتأخرات</th>
@@ -194,30 +308,30 @@ export async function generateInvoicePDF(
         <td>${fmt(invoice.currentReading)}</td>
         <td>${fmt(invoice.consumptionKwh)}</td>
         <td>${fmt(invoice.baseValue)}</td>
-        <td>${fmt(invoice.servicesAmount)}</td>
-        <td>${fmt(invoice.arrearsAmount)}</td>
-        <td>${fmt(invoice.paidDuringPeriod)}</td>
-        <td style="font-weight:bold; color:#c53030;">${fmt(invoice.netDue)}</td>
+        <td>${invoice.servicesAmount === 0 ? '0' : fmt(invoice.servicesAmount)}</td>
+        <td>${invoice.arrearsAmount === 0 ? '0' : fmt(invoice.arrearsAmount)}</td>
+        <td>${invoice.paidDuringPeriod === 0 ? '' : fmt(invoice.paidDuringPeriod)}</td>
+        <td class="net-due-value">${fmt(invoice.netDue)}</td>
       </tr>
-      <tr>
-        <td colspan="8" class="words-row">المبلغ المستحق كتابةً هو :- ${invoice.netDueWords}</td>
+      <tr class="words-row">
+        <td colspan="8">المبلغ المستحق كتابةً هو :- ${invoice.netDueWords}</td>
       </tr>
     </tbody>
   </table>
 
-  <div class="footer-note">
-    <span class="note">${footerNote}</span>
-    <span class="accounts">الحسابات</span>
+  <!-- SEPARATOR -->
+  <div class="bottom-separator">
+    <div class="separator-line"></div>
   </div>
 
-  <div class="signature-area">
-    <div class="signature-box">
-      <div class="line">توقيع المشترك</div>
-    </div>
-    <div class="signature-box">
-      <div class="line">توقيع الموظف</div>
-    </div>
-  </div>
+  <!-- TABLE 3: FOOTER NOTE (NO BORDERS) -->
+  <table class="footer-table">
+    <tr>
+      <td class="note-cell">${footerNote}</td>
+      <td class="accounts-cell">الحسابات</td>
+    </tr>
+  </table>
+
 </body>
 </html>`;
 
@@ -230,9 +344,9 @@ export async function generateInvoicePDF(
   await page.setContent(html, { waitUntil: 'networkidle0' });
   
   const pdfBuffer = await page.pdf({
-    format: 'A4',
+    format: 'Letter',
     printBackground: true,
-    margin: { top: '10mm', right: '10mm', bottom: '10mm', left: '10mm' },
+    margin: { top: '20mm', right: '25mm', bottom: '20mm', left: '25mm' },
   });
   
   await browser.close();

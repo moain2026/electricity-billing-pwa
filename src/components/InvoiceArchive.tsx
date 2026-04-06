@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 interface Invoice {
   id: string;
   invoiceNumber: string;
+  cycleNumber?: string;
   periodFrom: string;
   periodTo: string;
   consumptionKwh: number;
@@ -86,6 +87,7 @@ export default function InvoiceArchive() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="text-right p-3 text-sm font-semibold text-gray-600">رقم الفاتورة</th>
+                <th className="text-right p-3 text-sm font-semibold text-gray-600">الدورة</th>
                 <th className="text-right p-3 text-sm font-semibold text-gray-600">المشترك</th>
                 <th className="text-right p-3 text-sm font-semibold text-gray-600">الفترة</th>
                 <th className="text-right p-3 text-sm font-semibold text-gray-600">الاستهلاك</th>
@@ -96,15 +98,16 @@ export default function InvoiceArchive() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} className="p-8 text-center text-gray-400">جاري التحميل...</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-gray-400">جاري التحميل...</td></tr>
               ) : invoices.length === 0 ? (
-                <tr><td colSpan={7} className="p-8 text-center text-gray-400">لا توجد فواتير</td></tr>
+                <tr><td colSpan={8} className="p-8 text-center text-gray-400">لا توجد فواتير</td></tr>
               ) : (
                 invoices.map((inv) => {
                   const st = statusLabels[inv.status] || { text: inv.status, cls: 'bg-gray-100 text-gray-700' };
                   return (
                     <tr key={inv.id} className="border-t hover:bg-gray-50">
                       <td className="p-3 text-sm font-mono">{inv.invoiceNumber}</td>
+                      <td className="p-3 text-sm text-center">{inv.cycleNumber || '-'}</td>
                       <td className="p-3 text-sm">
                         <div className="font-medium">{inv.subscriber.subscriberName}</div>
                         <div className="text-xs text-gray-500">{inv.subscriber.subscriberNumber}</div>

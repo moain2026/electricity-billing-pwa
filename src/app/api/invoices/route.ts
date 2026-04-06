@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
     const data = await request.json();
     const {
       subscriberId,
+      cycleNumber = '',
       periodFrom,
       periodTo,
       previousReading,
@@ -119,6 +120,7 @@ export async function POST(request: NextRequest) {
     const invoice = await prisma.invoice.create({
       data: {
         invoiceNumber,
+        cycleNumber: String(cycleNumber || ''),
         subscriberId,
         periodFrom,
         periodTo,

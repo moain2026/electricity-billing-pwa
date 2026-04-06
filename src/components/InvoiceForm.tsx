@@ -35,6 +35,7 @@ export default function InvoiceForm() {
   const [createdInvoiceId, setCreatedInvoiceId] = useState('');
 
   const [form, setForm] = useState({
+    cycleNumber: '',
     periodFrom: '',
     periodTo: '',
     previousReading: '',
@@ -141,6 +142,7 @@ export default function InvoiceForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subscriberId: selectedSub.id,
+          cycleNumber: form.cycleNumber,
           periodFrom: form.periodFrom,
           periodTo: form.periodTo,
           previousReading: parseFloat(form.previousReading),
@@ -225,6 +227,10 @@ export default function InvoiceForm() {
         <h2 className="text-lg font-bold text-gray-700 mb-4">📊 بيانات الفاتورة</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">رقم الدورة</label>
+            <input type="text" name="cycleNumber" value={form.cycleNumber} onChange={handleChange} placeholder="مثال: 19" className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition outline-none text-sm" dir="ltr" />
+          </div>
+          <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">الفترة من <span className="text-red-500">*</span></label>
             <input type="text" name="periodFrom" value={form.periodFrom} onChange={handleChange} placeholder="2026/04/01" className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition outline-none text-sm" />
           </div>
@@ -303,9 +309,9 @@ export default function InvoiceForm() {
                 className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-700">
                 📥 تنزيل PDF
               </a>
-              <button onClick={() => { setSuccess(''); setCreatedInvoiceId(''); setSelectedSub(null); setForm({ ...form, previousReading: '', currentReading: '', servicesAmount: '0', arrearsAmount: '0', paidDuringPeriod: '0', notes: '' }); setCalc(null); }}
+              <button onClick={() => { setSuccess(''); setCreatedInvoiceId(''); setSelectedSub(null); setForm({ ...form, cycleNumber: '', previousReading: '', currentReading: '', servicesAmount: '0', arrearsAmount: '0', paidDuringPeriod: '0', notes: '' }); setCalc(null); }}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-700">
-                ✏️ فاتورة جديدة
+                فاتورة جديدة
               </button>
               <button onClick={() => router.push('/invoices/archive')}
                 className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200">

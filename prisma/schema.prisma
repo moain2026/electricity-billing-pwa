@@ -39,6 +39,7 @@ model Subscriber {
 model Invoice {
   id               String   @id @default(cuid())
   invoiceNumber    String   @unique
+  cycleNumber      String   @default("")
   subscriberId     String
   subscriber       Subscriber @relation(fields: [subscriberId], references: [id])
   periodFrom       String
